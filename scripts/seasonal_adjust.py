@@ -86,7 +86,7 @@ def classical_seasonal_adjustment(data: pd.Series,
     else:
         seasonally_adjusted = result.observed - result.seasonal
     
-    return seasonally_adjusted, result
+    return seassonally_adjusted, result
 
 
 def moving_average_seasonal_adjustment(data: pd.Series, 
@@ -96,7 +96,7 @@ def moving_average_seasonal_adjustment(data: pd.Series,
     Apply moving average seasonal adjustment.
     
     Parameters:
-    -----------
+    ------------
     data : pd.Series
         Time series with datetime index
     period : int, default=12
@@ -105,7 +105,7 @@ def moving_average_seasonal_adjustment(data: pd.Series,
         Model type: 'additive' or 'multiplicative'
         
     Returns:
-    --------
+    ---------
     seasonally_adjusted : pd.Series
         Seasonally adjusted series
     seasonal_component : pd.Series
@@ -275,18 +275,33 @@ def seasonal_adjust_auto(data: pd.Series,
             # Fall back to STL
             pass
     
-    # Use STL as reliable fallback
+    # Try STL as reliable fallback (requires statsmodels)
     if n_obs >= 24:
-        sa_series, result = stl_seasonal_adjustment(data, period=period, robust=True)
-        method = 'stl-decomposition'
-        details['trend_strength'] = 1 - (np.var(result.resid) / np.var(result.trend + result.resid))
-        details['seasonal_strength'] = 1 - (np.var(result.resid) / np.var(result.seasonal + result.resid))
-        return sa_series, method, details
+        try:
+            sa_series, result = stl_seasonal_adjustment(data, period=period, robust=True)
+            method = 'stl-decomposition'
+            details['trend_strength'] = 1 - (np.var(result.resid) / np.var(result.trend + result.resid))
+            details['seasonal_strength'] = 1 - (np.var(result.resid) / np.var(result.seasonal + result.resid))
+            return sa_series, method, details
+        except (ImportError, Exception):
+            # statsmodels not available, fall through to moving average
+            pass
     
-    # Short series: classical decomposition
-    sa_series, result = classical_seasonal_adjustment(data, period=period)
-    method = 'classical-decomposition'
+    # Try classical decomposition (requires statsmodels)
+    try:
+        sa_series, result = classical_seasonal_adjustment(data, period=period)
+        method = 'classical-decomposition'
+        details['model'] = 'multiplicative'
+        return sa_series, method, details
+    except (ImportError, Exception):
+        # statsmodels not available, fall through to moving average
+        pass
+    
+    # Final fallback: moving-average seasonal adjustment (pure pandas, no statsmodels)
+    sa_series, seasonal_component = moving_average_seasonal_adjustment(data, period=period)
+    method = 'moving-average'
     details['model'] = 'multiplicative'
+    details['seasonal_component'] = seasonal_component
     
     return sa_series, method, details
 

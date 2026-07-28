@@ -24,9 +24,9 @@ class EconomicNormalizer:
         self.transformations_applied = []
     
     def normalize_by_gdp(self, 
-                         value: Union[pd.Series, np.ndarray, float],
-                         gdp : Union[pd.Series, np.ndarray, float],
-                         multiply_by: float = 100.0) -> Union[pd.Series, np.ndarray, float]:
+                        value: Union[pd.Series, np.ndarray, float],
+                        gdp: Union[pd.Series, np.ndarray, float],
+                        multiply_by: float = 100.0) -> Union[pd.Series, np.ndarray, float]:
         """
         Normalize monetary values by GDP.
         
@@ -37,7 +37,7 @@ class EconomicNormalizer:
         - Government spending as % of GDP
         
         Parameters:
-        -----------
+        ----------
         value : numeric
             Monetary value to normalize (e.g., debt, deficit)
         gdp : numeric
@@ -51,7 +51,7 @@ class EconomicNormalizer:
             Value as percentage/ratio of GDP
             
         Example:
-        --------
+        ---------
         debt_to_gdp = normalizer.normalize_by_gdp(debt, gdp, multiply_by=100)
         """
         result = (value / gdp) * multiply_by
@@ -91,9 +91,9 @@ class EconomicNormalizer:
         return result
     
     def year_over_year_growth(self,
-                              data: pd.Series,
-                              periods: int = 1,
-                              method: str = 'percentage') -> pd.Series:
+                             data: pd.Series,
+                             periods: int = 1,
+                             method: str = 'percentage') -> pd.Series:
         """
         Calculate Year-over-Year (YoY) growth rate.
         
@@ -157,16 +157,16 @@ class EconomicNormalizer:
             Index value for base year
             
         Returns:
-        ---------
+        --------
         real : numeric
             Real (constant price) values
             
         Formula:
-        ---------
+        --------
         Real Value = (Nominal Value / Price Index) × Base Year Index
         
         Example:
-        ---------
+        --------
         # Adjust wages for inflation using CPI
         real_wages = normalizer.real_terms(nominal_wages, cpi, base_year_index=100)
         """
@@ -175,14 +175,14 @@ class EconomicNormalizer:
         return result
     
     def index_to_base_period(self,
-                             data: Union[pd.Series, np.ndarray],
-                             base_value: Optional[float] = None,
-                             base_index: float = 100.0) -> Union[pd.Series, np.ndarray]:
+                            data: Union[pd.Series, np.ndarray],
+                            base_value: Optional[float] = None,
+                            base_index: float = 100.0) -> Union[pd.Series, np.ndarray]:
         """
         Convert series to index with base period = 100 (or custom value).
         
         Parameters:
-        ------------
+        -----------
         data : numeric
             Time series data
         base_value : float, optional
@@ -191,7 +191,7 @@ class EconomicNormalizer:
             Index value for base period
             
         Returns:
-        ---------
+        --------
         indexed : numeric
             Indexed series
             
@@ -199,7 +199,7 @@ class EconomicNormalizer:
         --------
         # Set 2020 = 100
         stock_index = normalizer.index_to_base_period(stock_prices, 
-                                                          base_value=prices_2020)
+                                                       base_value=prices_2020)
         """
         if base_value is None:
             if isinstance(data, pd.Series):
@@ -212,8 +212,8 @@ class EconomicNormalizer:
         return result
     
     def purchasing_power_parity(self,
-                                 value: Union[pd.Series, np.ndarray, float],
-                                 exchange_rate: Union[pd.Series, np.ndarray, float],
+                                value: Union[pd.Series, np.ndarray, float],
+                                exchange_rate: Union[pd.Series, np.ndarray, float],
                                 ppp_conversion_factor: Union[pd.Series, np.ndarray, float]) -> Union[pd.Series, np.ndarray, float]:
         """
         Convert to PPP-adjusted values for cross-country comparison.
@@ -228,14 +228,14 @@ class EconomicNormalizer:
             PPP conversion factor from World Bank
             
         Returns:
-        ---------
+        --------
         ppp_value : numeric
             PPP-adjusted value
             
         Example:
-        ---------
+        --------
         # Compare GDPs across countries
-        gdp_pyp = normalizer.purchasing_power_parity(gdp_local, exchange_rate, ppp_factor)
+        gdp_ppp = normalizer.purchasing_power_parity(gdp_local, exchange_rate, ppp_factor)
         """
         result = value * (ppp_conversion_factor / exchange_rate)
         self.transformations_applied.append('purchasing_power_parity')
@@ -243,7 +243,7 @@ class EconomicNormalizer:
     
     def percentage_of_total(self,
                            value: Union[pd.Series, np.ndarray],
-                            total: Union[pd.Series, np.ndarray, float]) -> Union[pd.Series, np.ndarray]:
+                           total: Union[pd.Series, np.ndarray, float]) -> Union[pd.Series, np.ndarray]:
         """
         Express as percentage of total.
         
@@ -253,7 +253,7 @@ class EconomicNormalizer:
         - Budget allocation percentages
         
         Parameters:
-        ------------
+        -----------
         value : numeric
             Component value
         total : numeric
@@ -283,19 +283,19 @@ class EconomicNormalizer:
         - Jobs per labor force participant
         
         Parameters:
-        ------------
+        -----------
         value : numeric
             Value to normalize
         labor_force : numeric
             Labor force size
             
         Returns:
-        ---------
+        --------
         per_worker : numeric
             Value per labor force participant
             
         Example:
-        ---------
+        --------
         gdp_per_worker = normalizer.per_labor_force(gdp, labor_force)
         """
         result = value / labor_force
@@ -303,40 +303,59 @@ class EconomicNormalizer:
         return result
     
     def cyclically_adjusted(self,
-                            actual: pd.Series,
-                             potential: pd.Series) -> pd.Series:
+                           actual: pd.Series,
+                           potential: pd.Series,
+                           elasticity: float = 1.0) -> pd.Series:
         """
         Calculate cyclically adjusted (structural) component.
         
         Removes business cycle effects to reveal underlying trend.
         
         Parameters:
-        ------------
+        -----------
         actual : pd.Series
-            Actual economic variable
+            Actual economic variable (e.g., budget balance, revenue)
         potential : pd.Series
             Potential/trend component (from HP filter, CBO estimates, etc.)
+        elasticity : float, default=1.0
+            Elasticity of the variable with respect to the output gap.
+            A value of 1.0 means the variable moves 1:1 with the gap.
+            For budget balances, typical elasticity is ~0.5 (revenues 
+            respond less than 1:1 to GDP gaps). Use the appropriate 
+            elasticity for the economic variable being adjusted.
             
         Returns:
         --------
         adjusted : pd.Series
             Cyclically adjusted series
             
+        Formula:
+        --------
+        output_gap = (actual - potential) / potential
+        cyclical_component = elasticity * output_gap * potential
+        adjusted = actual - cyclical_component
+            
         Example:
-        ---------
+        --------
         # Cyclically adjusted budget balance
         structural_balance = normalizer.cyclically_adjusted(actual_balance, 
-                                                           potential_balance)
+                                                            potential_balance,
+                                                            elasticity=0.5)
         """
-        output_gap = actual - potential
-        # Simple approach: remove the gap
-        adjusted = actual - output_gap
+        # Output gap as fraction of potential
+        output_gap = (actual - potential) / potential
+        
+        # Cyclical component: how much of actual is due to the cycle
+        cyclical_component = elasticity * output_gap * potential
+        
+        # Remove cyclical component to get structural/adjusted value
+        adjusted = actual - cyclical_component
         
         self.transformations_applied.append('cyclically_adjusted')
         return adjusted
     
     def quarter_over_quarter_annualized(self,
-                                      data: pd.Series,
+                                       data: pd.Series,
                                        periods: int = 1) -> pd.Series:
         """
         Calculate quarter-over-quarter growth, annualized.
@@ -351,16 +370,16 @@ class EconomicNormalizer:
             Number of quarters to compare
             
         Returns:
-        ---------
+        --------
         annualized_growth : pd.Series
-            Annualized quarterly growth rate (%%)
+            Annualized quarterly growth rate (%)
             
         Formula:
-        ---------
+        --------
         Annualized Rate = ((Q_t / Q_{t-1})^4 - 1) × 100
         
         Example:
-        ---------
+        --------
         gdp_growth_annualized = normalizer.quarter_over_quarter_annualized(gdp)
         """
         growth = (data / data.shift(periods)) - 1
@@ -376,7 +395,7 @@ class EconomicNormalizer:
         Calculate month-over-month growth rate.
         
         Parameters:
-        ------------
+        -----------
         data : pd.Series
             Monthly time series
         annualized : bool, default=False
@@ -388,7 +407,7 @@ class EconomicNormalizer:
             Monthly growth rate (%)
             
         Example:
-        ---------
+        --------
         cpi_mom = normalizer.month_over_month(cpi, annualized=True)
         """
         growth = ((data / data.shift(1)) - 1) * 100
@@ -397,7 +416,7 @@ class EconomicNormalizer:
             growth = ((1 + growth/100) ** 12 - 1) * 100
             self.transformations_applied.append('month_over_month_annualized')
         else:
-             self.transformations_applied.append('month_over_month')
+            self.transformations_applied.append('month_over_month')
         
         return growth
     
@@ -442,25 +461,25 @@ class EconomicNormalizer:
         return contribution
     
     def normalize_by_area(self,
-                          value: Union[pd.Series, np.ndarray, float],
-                          area_km2: float) -> Union[pd.Series, np.ndarray, float]:
+                         value: Union[pd.Series, np.ndarray, float],
+                         area_km2: float) -> Union[pd.Series, np.ndarray, float]:
         """
         Normalize by geographic area (density calculation).
         
         Parameters:
-        ------------
+        -----------
         value : numeric
             Value to normalize (e.g., population, GDP)
         area_km2 : float
             Area in square kilometers
             
         Returns:
-        ---------
+        --------
         density : numeric
             Value per km²
             
         Example:
-        ----------
+        --------
         pop_density = normalizer.normalize_by_area(population, area_km2)
         """
         result = value / area_km2
@@ -474,19 +493,19 @@ class EconomicNormalizer:
         Calculate cumulative growth from a starting period.
         
         Parameters:
-        ------------
+        -----------
         data : pd.Series
             Time series with datetime index
         start_period : str, optional
             Starting period (if None, uses first value)
             
         Returns:
-        ---------
+        --------
         cumulative : pd.Series
             Cumulative growth rate (%)
             
         Example:
-        ---------
+        --------
         # Growth since start of 2020
         cumulative = normalizer.cumulative_growth_rate(stock_prices, '2020-01-01')
         """
@@ -501,22 +520,22 @@ class EconomicNormalizer:
         return cumulative
     
     def three_month_moving_average(self,
-                                     data: pd.Series) -> pd.Series:
+                                   data: pd.Series) -> pd.Series:
         """
         Calculate 3-month moving average (common for smoothing monthly data).
         
         Parameters:
-        ------------
+        -----------
         data : pd.Series
             Monthly time series
             
         Returns:
-        ---------
+        --------
         ma3 : pd.Series
             3-month moving average
             
         Example:
-        -----------
+        --------
         smoothed_employment = normalizer.three_month_moving_average(employment)
         """
         ma3 = data.rolling(window=3, center=False).mean()
@@ -543,7 +562,7 @@ def normalize_hicp(data: pd.Series,
         Index value for reference year
         
     Returns:
-    ---------
+    --------
     hicp_indexed : pd.Series
         HICP-standardized series
         
@@ -577,19 +596,19 @@ def normalize_chain_weighted(components: Dict[str, pd.Series],
     composition of the economy.
     
     Parameters:
-    ------------
+    -----------
     components : dict
         Dictionary of component series (e.g., {'consumption': series, 'investment': series})
     weights : dict, optional
         Dictionary of weight series (if None, uses equal weights)
         
     Returns:
-    ---------
+    --------
     chain_index : pd.Series
         Chain-weighted aggregate index
         
     Example:
-    ---------
+    --------
     gdp_chain = normalize_chain_weighted({
         'C': consumption,
         'I': investment,
@@ -602,7 +621,7 @@ def normalize_chain_weighted(components: Dict[str, pd.Series],
         n = len(components)
         weights = {k: pd.Series(1/n, index=v.index) for k, v in components.items()}
     
-    # Calculate weighted sum per period by period
+    # Calculate weighted sum period by period
     result_index = components[list(components.keys())[0]].index
     chain_index = pd.Series(index=result_index, dtype=float)
     
@@ -624,6 +643,7 @@ def normalize_chain_weighted(components: Dict[str, pd.Series],
             chain_index.iloc[i] = chain_index.iloc[i-1] * (1 + weighted_growth)
     
     return chain_index
+
 
 if __name__ == "__main__":
     print("Economic Normalizations Module - Test Suite")

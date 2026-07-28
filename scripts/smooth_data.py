@@ -40,20 +40,20 @@ def henderson_filter(data: np.ndarray, length: int = 13) -> np.ndarray:
     
     # Handle endpoints with asymmetric filters
     for i in range(half_length):
-        # Left endpoint
+        # Left endpoint: use rightmost n_available weights (missing data to the left)
         n_available = i + half_length + 1
         if n_available >= 3:
-            w = weights[half_length-i:half_length+i+1]
+            w = weights[half_length - i:]  # Rightmost n_available weights
             w = w / np.sum(w)  # Renormalize
             smoothed[i] = np.sum(w * data[:n_available])
         
-        # Right endpoint
+        # Right endpoint: use leftmost n_available weights (missing data to the right)
         j = len(data) - 1 - i
         n_available = half_length + i + 1
         if n_available >= 3:
-            w = weights[half_length-i:half_length+i+1]
+            w = weights[:n_available]  # Leftmost n_available weights
             w = w / np.sum(w)
-            smoothed[j] = np.sum(w * data[j-i-half_length:])
+            smoothed[j] = np.sum(w * data[j - half_length:])
     
     return smoothed
 
@@ -64,9 +64,9 @@ def _get_henderson_weights(length: int) -> np.ndarray:
         5: np.array([-0.073, 0.294, 0.558, 0.294, -0.073]),
         9: np.array([-0.041, -0.010, 0.119, 0.267, 0.330, 0.267, 0.119, -0.010, -0.041]),
         13: np.array([-0.019, -0.028, 0.000, 0.066, 0.147, 0.214, 0.240, 0.214, 0.147, 0.066, 0.000, -0.028, -0.019]),
-        23: np.array([-0.007, -0.014, -0.017, -0.016, -0.011, -0.004, 0.007, 0.018, 0.031, 0.045,
+        23: np.array([-0.014, -0.017, -0.016, -0.011, -0.004, 0.007, 0.018, 0.031, 0.045,
                      0.058, 0.068, 0.075, 0.068, 0.058, 0.045, 0.031, 0.018, 0.007, -0.004,
-                     -0.011, -0.016, -0.017, -0.014, -0.007])
+                     -0.011, -0.016, -0.017, -0.014])
     }
     return weights_dict[length]
 
@@ -137,9 +137,9 @@ def double_exponential_smoothing(data: np.ndarray,
         
     Returns:
     --------
-    smoothed : np.ndarray
+    smoothed : np.array
         Smoothed series
-    trend : np.ndarray
+    trend : np.array
         Trend component
     """
     n = len(data)
@@ -180,7 +180,7 @@ def simple_moving_average(data: np.ndarray, window: int = 12) -> np.ndarray:
     ma = np.full_like(data, np.nan, dtype=float)
     
     for i in range(window - 1, len(data)):
-        ma[i] = np.mean(data[i-window+1:i+™]
+        ma[i] = np.mean(data[i-window+1:i+1])
     
     return ma
 
@@ -190,7 +190,7 @@ def centered_moving_average(data: np.ndarray, window: int = 12) -> np.ndarray:
     Calculate centered moving average.
     
     Parameters:
-    ------------
+    -----------
     data : np.ndarray
         Input time series
     window : int, default=12
@@ -250,7 +250,7 @@ def loess_smoothing(data: np.ndarray, frac: float = 0.1) -> np.ndarray:
     Apply LOESS (locally weighted scatterplot smoothing).
     
     Parameters:
-    -----------
+    ------------
     data : np.ndarray
         Input time series
     frac : float, default=0.1
@@ -276,7 +276,7 @@ def savitzky_golay_filter(data: np.ndarray,
     Apply Savitzky-Golay filter.
     
     Parameters:
-    -----------
+    ------------
     data : np.ndarray
         Input time series
     window_length : int, default=11
@@ -309,7 +309,7 @@ def smooth_auto(data: np.ndarray,
     Automatically select and apply smoothing method.
     
     Parameters:
-    -----------
+    ------------
     data : np.ndarray
         Input data
     is_time_series : bool, default=True
@@ -318,7 +318,7 @@ def smooth_auto(data: np.ndarray,
         Pre-computed data assessment
         
     Returns:
-    --------
+    ---------
     smoothed : np.ndarray
         Smoothed data
     method_used : str
@@ -415,7 +415,7 @@ if __name__ == "__main__":
     print("\n2. Exponential Smoothing:")
     alpha_opt = optimal_exponential_alpha(test_data)
     smooth_exp = exponential_smoothing(test_data, alpha=alpha_opt)
-    print(f"   Optimal alpha: {alpha_opt:.3f}")
+    print(f"  Optimal alpha: {alpha_opt:.3f}")
     print(f"   Smoothed std: {np.std(smooth_exp):.2f}")
     
     print("\n3. Simple Moving Average (12-period):")
