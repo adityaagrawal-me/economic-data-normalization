@@ -1,0 +1,30 @@
+{
+  "repo": {
+    "owner": "adityaagrawal-me",
+    "name": "economic-data-normalization",
+    "branch": "main"
+  },
+  "last_sync_sha_file": ".last_sync_sha",
+  "tracked_files": [
+    "SKILL.md",
+    "README.md",
+    "requirements.txt",
+    "sync_manifest.json",
+    "references/economic_normalizations.md",
+    "references/normalization_methods.md",
+    "references/outlier_detection.md",
+    "references/seasonal_adjustment.md",
+    "references/smoothing_techniques.md",
+    "scripts/analyze_data.py",
+    "scripts/detect_outliers.py",
+    "scripts/economic_normalizations.py",
+    "scripts/normalize_data.py",
+    "scripts/process_data.py",
+    "scripts/seasonal_adjust.py",
+    "scripts/smooth_data.py"
+  ],
+  "excluded_files": [
+    "assets/icon.png"
+  ],
+  "note": "assets/icon.png is a static binary asset and is not synced from the repo. All other files are text and synced via GITHUB__GET_FILE_CONTENT (base64 content)."
+}
