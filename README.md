@@ -87,7 +87,7 @@ final_data = processor.processed_data
 | Grubbs | Normal, few outliers | Formal statistical test | Assumes normality |
 | DBSCAN | Complex patterns | Finds clusters | Requires parameter tuning |
 
-#### Normalizatioo
+#### Normalization
 
 | Method | Best For | Output Range |
 |--------|----------|--------------|
@@ -99,7 +99,7 @@ final_data = processor.processed_data
 #### Seasonal Adjustment
 
 | Method | Frequencies | Use Case |
-|--------|--------------|----------|
+|--------|-------------|----------|
 | X-13ARIMA-SEATS | Monthly, Quarterly | Official statistics |
 | STL | Any period | General purpose, robust |
 | Classical | Any period | Quick exploration |
@@ -107,7 +107,7 @@ final_data = processor.processed_data
 #### Smoothing
 
 | Method | Best For | Characteristics |
-|-------|----------|-----------------|
+|--------|----------|-----------------|
 | Henderson | Economic trends | Preserves polynomials |
 | Exponential | Forecasting | Adaptive weights |
 | Moving Average | Quick smoothing | Simple, intuitive |
@@ -117,7 +117,7 @@ final_data = processor.processed_data
 
 ### Using the Economic Normalizer
 
-```pythonx
+```python
 from economic_normalizations import EconomicNormalizer
 
 # Initialize normalizer
@@ -127,7 +127,7 @@ econ_norm = EconomicNormalizer()
 debt_to_gdp = econ_norm.normalize_by_gdp(
     value=government_debt,  # in billions
     gdp=gdp,                # in billions
-    multiply_by=100          # for percentage
+    multiply_by=100         # for percentage
 )
 print(f"Debt-to-GDP: {debt_to_gdp.iloc[-1]:.1f}%")
 
@@ -154,11 +154,11 @@ real_wages = econ_norm.real_terms(
 )
 
 # Example 5: Quarter-over-Quarter Annualized Growth (US GDP style)
-gdp_growth_sar = econ_norm.quarter_over_quarter_annualized(
+gdp_growth_saar = econ_norm.quarter_over_quarter_annualized(
     data=quarterly_gdp,
     periods=1
 )
-print(f"GDP growth (SAAR): {gdp_growth_sar.iloc[-1]:.1f}%")
+print(f"GDP growth (SAAR): {gdp_growth_saar.iloc[-1]:.1f}%")
 
 # Example 6: PPP Adjustment for Cross-Country Comparison
 gdp_ppp = econ_norm.purchasing_power_parity(
@@ -193,7 +193,7 @@ hicp_series = normalize_hicp(
 ### Chain-Weighted Indices
 
 ```python
-from economic_normalization import normalize_chain_weighted
+from economic_normalizations import normalize_chain_weighted
 
 # Calculate chain-weighted real GDP
 gdp_chain = normalize_chain_weighted(
@@ -271,7 +271,8 @@ cleaned_data = processor.processed_data.to_csv('cleaned_data.csv')
 
 ### Multiple Series Processing
 
-```python# Process multiple related series
+```python
+# Process multiple related series
 gdp_data = pd.read_csv('macro_data.csv', index_col=0, parse_dates=True)
 
 results = {}
@@ -288,7 +289,7 @@ for column in ['GDP', 'CPI', 'Unemployment']:
         normalize=True
     )
 
- Combine normalized series for comparison
+# Combine normalized series for comparison
 normalized_df = pd.DataFrame(results)
 ```
 
@@ -313,17 +314,30 @@ print(summary)
 ### Reports
 
 The skill generates comprehensive markdown reports including:
-- Descriptive statistics- Distribution characteristics- Outlier assessment- Method recommendations- Processing summary
+- Descriptive statistics
+- Distribution characteristics
+- Outlier assessment
+- Method recommendations
+- Processing summary
 
 ### Diagnostic Plots
 
 Automatically generated plots:
-1. **Comparison Plot**: Original vs Processed time series:2. **Distribution Plot**: Histograms before and after processing
+1. **Comparison Plot**: Original vs Processed time series
+2. **Distribution Plot**: Histograms before and after processing
 
 ## Dependencies
 
-Required Python packages (automatically available):
-- numpy- pandas- scipy- scikit-learn- statsmodels- matplotlib
+Required Python packages (install via `pip install -r requirements.txt`):
+- numpy
+- pandas
+- scipy
+- scikit-learn
+- statsmodels (required for STL, classical, and X-13 seasonal adjustment; if absent, seasonal adjustment falls back to the moving-average method)
+- matplotlib
+> **Note:** These packages are **not** automatically installed. Install them before using the skill.
+> If `statsmodels` is not available, seasonal adjustment automatically falls back to the
+> pure-pandas moving-average method so the pipeline still runs.
 
 ## Best Practices
 
@@ -331,35 +345,45 @@ Required Python packages (automatically available):
 ```python
 processor.analyze()  # Understand your data first
 ```
-	### 2. Process in Correct OrderRRecommended sequence:
+
+### 2. Process in Correct Order
+Recommended sequence:
 1. Outlier detection
-2. Seasonal adjustment (for time seriees)
-3. Normalization4. Smoothing
-	### 3. Document Your Choices
+2. Seasonal adjustment (for time series)
+3. Normalization
+4. Smoothing
+
+### 3. Document Your Choices
 ```python# Keep track of processing steps
 steps = processor.steps_applied
 report = processor.generate_summary_report()
 ```
-	### 4. Validate Results
-```python# Always review diagnostic plotsplots = processor.generate_diagnostic_plots()
+
+### 4. Validate Results
+```python
+# Always review diagnostic plots
+plots = processor.generate_diagnostic_plots()
 
 # Check processed data makes sense
 print(processor.processed_data.describe())
 ```
-	## Common Use Cases
-	### Use Case 1: Clean GDP Data
+
+## Common Use Cases
+
+### Use Case 1: Clean GDP Data
 ```python
 processor = EconomicDataProcessor(gdp_series, "GDP")
 processor.analyze()
 processor.detect_outliers(treatment='winsorize')  # Cap extremes
 processor.seasonal_adjust(method='x13')  # Official method
-processed_gdp = processor.processsed_data
+processed_gdp = processor.processed_data
 ```
-	### Use Case 2: Prepare Data for ML
+
+### Use Case 2: Prepare Data for ML
 ```python
 processor = EconomicDataProcessor(features, "Features")
 processor.detect_outliers(treatment='remove')
-processor.normalize(purpose='ml')  # Z-score scaling
+processor.normalize(purpose='m,')  # Z-score scaling
 ml_ready_data = processor.processed_data
 ```
 
@@ -370,8 +394,11 @@ processor.smooth(method='henderson')  # Extract smooth trend
 processor.normalize(purpose='visualization')  # Scale to [0,1]
 viz_data = processor.processed_data
 ```
+
 ### Use Case 4: Academic Research
-```python# Full pipeline with publication-quality methodsprocessor = EconomicDataProcessor(research_data, "Study Variable")
+```python
+# Full pipeline with publication-quality methods
+processor = EconomicDataProcessor(research_data, "Study Variable")
 processed = processor.process_full_pipeline(
     detect_outliers=True,
     seasonal_adjust=True,
@@ -387,18 +414,23 @@ with open('methods_appendix.md', 'w') as f:
 ```
 
 ## Troubleshooting
-	### X-13 Not Available
+
+### X-13 Not Available
 If X-13ARIMA-SEATS is not installed, the skill automatically falls back to STL decomposition.
 
 ### Too Few Observations
-- Minimum recommended: 24 observations for seasonal adjustment- For short series, disable seasonal adjustment or use classical method
+- Minimum recommended: 24 observations for seasonal adjustment
+- For short series, disable seasonal adjustment or use classical method
 
-### Heavy OutliersIf many outliers detected (>10%):
+### Heavy Outliers
+If many outliers detected (>10%):
 - Consider DBSCAN method for complex patterns
 - Or use robust scaling instead of removal
-	### Non-positive Data for Log Transform
+
+### Non-positive Data for Log Transform
 The skill automatically handles zeros/negatives by adding constants. Check the transform parameters in the report.
-	## References
+
+## References
 
 All methods implemented follow standard econometric practices:
 - X-13ARIMA-SEATS: U.S. Census Bureau
