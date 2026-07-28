@@ -63,6 +63,19 @@ class EconomicDataProcessor:
         self.seasonal_info = None
         self.smoothing_info = None
         
+    def _reassess(self):
+        """Re-run data assessment on the current processed data.
+        
+        Called after each pipeline step (outlier removal, normalization, etc.)
+        so that downstream method selection reflects the updated distribution
+        rather than the original data characteristics.
+        """
+        data_array = self.processed_data.values
+        self.assessment = assess_data(data_array, self.name)
+        # Also refresh seasonality info for time series
+        if isinstance(self.processed_data.index, pd.DatetimeIndex):
+            self.seasonality_info = check_seasonality(self.processed_data)
+    
     def analyze(self) -> Dict:
         """Run comprehensive data assessment."""
         print(f"Analyzing: {self.name}")
@@ -156,6 +169,10 @@ class EconomicDataProcessor:
             'details': details
         }
         
+        # Re-assess data after outlier treatment (distribution has changed)
+        if treatment != 'keep':
+            self._reassess()
+        
         return self.processed_data
     
     def normalize(self, method: Optional[str] = None, purpose: str = 'comparison') -> pd.Series:
@@ -221,6 +238,9 @@ class EconomicDataProcessor:
             'details': details
         }
         
+        # Re-assess data after normalization (distribution has changed)
+        self._reassess()
+        
         return self.processed_data
     
     def seasonal_adjust(self, method: Optional[str] = None, period: Optional[int] = None) -> pd.Series:
@@ -283,6 +303,9 @@ class EconomicDataProcessor:
             'details': details
         }
         
+        # Re-assess data after seasonal adjustment (seasonal component removed)
+        self._reassess()
+        
         return self.processed_data
     
     def smooth(self, method: Optional[str] = None) -> pd.Series:
@@ -344,6 +367,9 @@ class EconomicDataProcessor:
             'method': method_used,
             'details': details
         }
+        
+        # Re-assess data after smoothing (distribution has changed)
+        self._reassess()
         
         return self.processed_data
     
