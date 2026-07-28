@@ -66,7 +66,7 @@ def assess_data(data: np.ndarray, data_name: str = "data") -> Dict:
     else:
         # Use Kolmogorov-Smirnov for large samples
         ks_stat, ks_p = stats.kstest(clean_data, 'norm', 
-                                      args=(assessment['mean'], assessment['std']))
+                                     args=(assessment['mean'], assessment['std']))
         assessment['normality_test'] = 'kolmogorov-smirnov'
         assessment['normality_stat'] = ks_stat
         assessment['normality_p'] = ks_p
@@ -94,7 +94,7 @@ def assess_data(data: np.ndarray, data_name: str = "data") -> Dict:
     
     # Check for zeros and negatives
     assessment['n_zeros'] = np.sum(clean_data == 0)
-    assessment[''negative'] = np.sum(clean_data < 0)
+    assessment['n_negative'] = np.sum(clean_data < 0)
     assessment['all_positive'] = assessment['n_negative'] == 0 and assessment['n_zeros'] == 0
     
     return assessment
@@ -114,17 +114,22 @@ def recommend_outlier_method(assessment: Dict) -> Tuple[str, str]:
     if assessment['n_obs'] < 20:
         return 'iqr', "Small sample size (<20) - IQR most robust"
     
-    if assessment['is_normal'] and assessment['outlier_pct_z3'] < 5:
-        return 'grubbs', "Data approximately normal with few outliers - Grubbs test provides formal statistical test"
+    # Many outliers takes priority over distribution shape
+    if assessment['outlier_pct_z3'] > 10:
+        return 'dbscan', "Many outliers detected - DBSCAN can identify outlier clusters"
     
-    if assessment['is_normal'] and assessment['outlier_pct_z3'] < 10:
-        return 'z-score', "Data approximately normal - Z-score method fast and effective"
-    
+    # IQR is the default: robust, distribution-free, and well-suited to
+    # economic data which is rarely perfectly normal.
     if assessment['distribution'] in ['right-skewed', 'left-skewed']:
         return 'iqr', "Skewed distribution - IQR method robust and distribution-free"
     
-    if assessment['outlier_pct_z3'] > 10:
-        return 'dbscan', "Many outliers detected - DBSCAN can identify outlier clusters"
+    # Grubbs is an opt-in for the narrow case of approximately normal data
+    # with very few outliers (<2%), where a formal statistical test adds value.
+    if assessment['is_normal'] and assessment['outlier_pct_z3'] < 2:
+        return 'grubbs', "Data approximately normal with very few outliers (<2%) - Grubbs test provides formal statistical test"
+    
+    if assessment['is_normal'] and assessment['outlier_pct_z3'] < 10:
+        return 'z-score', "Data approximately normal - Z-score method fast and effective"
     
     # Default
     return 'iqr', "General robust method suitable for most economic data"
@@ -195,7 +200,7 @@ def recommend_smoothing_method(assessment: Dict, is_time_series: bool = True) ->
         Whether data is time series
         
     Returns:
-    ---------
+    --------
     method : str
         Recommended method name
     reason : str
@@ -214,7 +219,7 @@ def recommend_smoothing_method(assessment: Dict, is_time_series: bool = True) ->
     if cv > 0.3:  # High volatility
         return 'exponential-smoothing', "High volatility - Exponential smoothing adapts to recent changes"
     
-    if assessment['nn_obs'] >= 100:
+    if assessment['n_obs'] >= 100:
         return 'henderson', "Sufficient length - Henderson filter preserves economic trends"
     
     # Default
@@ -226,14 +231,14 @@ def check_seasonality(data: pd.Series, max_period: int = 52) -> Dict:
     Detect potential seasonal patterns in time series.
     
     Parameters:
-    ------------
+    -----------
     data : pd.Series
         Time series with datetime index
     max_period : int, default=52
         Maximum period to test (52 weeks, 12 months, etc.)
         
     Returns:
-    ---------
+    --------
     seasonality_info : dict
         Detected seasonal patterns and strengths
     """
@@ -250,11 +255,22 @@ def check_seasonality(data: pd.Series, max_period: int = 52) -> Dict:
     freqs = fftfreq(n, d=1)[:n//2]
     
     # Find peaks in FFT (potential seasonal periods)
-    peaks, properties = find_peaks(fft_vals, height=np.max(fft_vals) * 0.05)
+    # Use a higher threshold (10% of max) to reduce false positives
+    max_fft = np.max(fft_vals) if len(fft_vals) > 0 else 0
+    peaks, properties = find_peaks(fft_vals, height=max_fft * 0.10)
     
     # Convert frequencies to periods
     periods = [1/freqs[p] for p in peaks if freqs[p] > 0]
     periods = [int(round(p)) for p in periods if 2 <= p <= max_period]
+    
+    # Filter to only strong peaks: keep periods whose FFT power is at least
+    # 25% of the strongest peak (reduces harmonic/leakage false positives)
+    if len(peaks) > 0 and max_fft > 0:
+        peak_powers = fft_vals[peaks]
+        strong_mask = peak_powers >= max_fft * 0.25
+        strong_peaks = peaks[strong_mask]
+        periods = [1/freqs[p] for p in strong_peaks if freqs[p] > 0]
+        periods = [int(round(p)) for p in periods if 2 <= p <= max_period]
     
     # Check common economic periods
     common_periods = {
@@ -265,15 +281,16 @@ def check_seasonality(data: pd.Series, max_period: int = 52) -> Dict:
     }
     
     detected = []
-    for periol, name in common_periods.items():
-        if period in periods or any(abs(p - period) <= 1 for p in periods):
+    for period, name in common_periods.items():
+        # Only report a common period if it's an exact match (not within ±1)
+        if period in periods:
             detected.append({'period': period, 'name': name})
     
     return {
         'has_seasonality': len(detected) > 0,
         'detected_periods': detected,
         'all_periods': periods[:5],  # Top 5
-        'strength': np.max(fft_vals) / np.mean(fft_vals) if len(fft_vals) > 0 else 0
+        'strength': max_fft / np.mean(fft_vals) if len(fft_vals) > 0 and np.mean(fft_vals) > 0 else 0
     }
 
 
@@ -298,7 +315,7 @@ def recommend_seasonal_method(seasonality_info: Dict, n_obs: int) -> Tuple[Optio
     has_quarterly = any(d['period'] == 4 for d in detected)
     
     if (has_monthly or has_quarterly) and n_obs >= 36:
-        return 'x13-arima-seats', f"Standard economic frequency detected ({detected[0]['year']}) - X-13ARIMA-SEATS provides official method"
+        return 'x13-arima-seats', f"Standard economic frequency detected ({detected[0]['name']}) - X-13ARIMA-SEATS provides official method"
     
     if n_obs >= 24:
         return 'stl', f"Seasonal pattern detected - STL decomposition flexible and robust"
@@ -307,7 +324,7 @@ def recommend_seasonal_method(seasonality_info: Dict, n_obs: int) -> Tuple[Optio
 
 
 def generate_report(assessment: Dict, 
-                  outlier_rec: Tuple[str, str],
+                   outlier_rec: Tuple[str, str],
                    norm_rec: Tuple[str, str],
                    smooth_rec: Tuple[str, str],
                    seasonal_rec: Tuple[Optional[str], str]) -> str:
